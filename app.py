@@ -19,6 +19,7 @@ def replace_key_uri(line, headers_query):
     return line
 
 def extract_headers_from_request():
+    # Gelen query'den h_ ile başlayanları header formatına çevir
     return {
         unquote(k[2:]).replace("_", "-"): unquote(v).strip()
         for k, v in request.args.items()
@@ -38,32 +39,34 @@ def proxy_m3u():
     headers = {**default_headers, **extract_headers_from_request()}
 
     try:
-        response = requests.get(m3u_url, headers=headers, timeout=(10, 20))
-        response.raise_for_status()
-        m3u_content = response.text
+        resp = requests.get(m3u_url, headers=headers, timeout=(10, 20))
+        resp.raise_for_status()
+        m3u_content = resp.text
         file_type = detect_m3u_type(m3u_content)
 
-        # Burada segment uzantılarını genişlettik
         allowed_extensions = [".ts", ".avif", ".mp4", ".aac", ".m4s", ".jpg", ".png"]
         segment_lines = [l for l in m3u_content.splitlines() if l.strip() and not l.startswith("#")]
+
         if file_type == "m3u8" and all(any(ext in l for ext in allowed_extensions) for l in segment_lines):
+            # Eğer direkt streamlenebilir uzantılar varsa orijinal content-type ile dön
             return Response(m3u_content, content_type="application/vnd.apple.mpegurl")
 
-        parsed_url = urlparse(response.url)
+        parsed_url = urlparse(resp.url)
         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/', 1)[0]}/"
         headers_query = "&".join([f"h_{quote(k)}={quote(v)}" for k, v in headers.items()])
 
-        modified_m3u8 = []
+        modified_lines = []
         for line in m3u_content.splitlines():
             line = line.strip()
             if line.startswith("#EXT-X-KEY") and 'URI="' in line:
                 line = replace_key_uri(line, headers_query)
             elif line and not line.startswith("#"):
                 full_url = urljoin(base_url, line)
+                # Segmentleri proxy/ts endpointine yönlendiriyoruz, headerları da parametre olarak iletiyoruz
                 line = f"/proxy/ts?url={quote(full_url)}&{headers_query}"
-            modified_m3u8.append(line)
+            modified_lines.append(line)
 
-        return Response("\n".join(modified_m3u8), content_type="application/vnd.apple.mpegurl")
+        return Response("\n".join(modified_lines), content_type="application/vnd.apple.mpegurl")
 
     except requests.RequestException as e:
         return f"İndirme hatası: {str(e)}", 500
@@ -75,20 +78,20 @@ def proxy_ts():
         return "Hata: 'url' parametresi eksik", 400
 
     headers = extract_headers_from_request()
+    # Eğer Accept-Encoding varsa 'gzip, deflate, br' gibi ayar yapabiliriz (requests default handle eder)
 
     try:
-        response = requests.get(ts_url, headers=headers, stream=True, timeout=(10, 30))
-        response.raise_for_status()
-
-        # İçerik tipine göre response header ayarı
-        content_type = response.headers.get("Content-Type", "application/octet-stream")
+        # Stream modunda segmenti çekip aynı şekilde akıtıyoruz
+        resp = requests.get(ts_url, headers=headers, stream=True, timeout=(10, 30))
+        resp.raise_for_status()
 
         def generate():
-            for chunk in response.iter_content(chunk_size=8192):
+            for chunk in resp.iter_content(chunk_size=8192):
                 if chunk:
                     yield chunk
 
-        return Response(generate(), content_type=content_type)
+        # İçeriği video/mp2t olarak dön, segment tipine göre Content-Type değişebilir ama genelde bu yeterli
+        return Response(generate(), content_type=resp.headers.get('Content-Type', 'application/octet-stream'))
 
     except requests.RequestException as e:
         return f"Segment hatası: {str(e)}", 500
@@ -102,9 +105,9 @@ def proxy_key():
     headers = extract_headers_from_request()
 
     try:
-        response = requests.get(key_url, headers=headers, timeout=(5, 15))
-        response.raise_for_status()
-        return Response(response.content, content_type="application/octet-stream")
+        resp = requests.get(key_url, headers=headers, timeout=(5, 15))
+        resp.raise_for_status()
+        return Response(resp.content, content_type="application/octet-stream")
     except requests.RequestException as e:
         return f"Key hatası: {str(e)}", 500
 
