@@ -42,7 +42,7 @@ def proxy_m3u():
     headers = {**default_headers, **extract_headers_from_request()}
 
     try:
-        response = requests.get(m3u_url, headers=headers, timeout=(10, 20))
+        response = requests.get(m3u_url, headers=headers, timeout=(10, 20), verify=False)
         response.raise_for_status()
         m3u_content = response.text
         file_type = detect_m3u_type(m3u_content)

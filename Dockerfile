@@ -1,6 +1,6 @@
 # Dockerfile (Render.com veya başka bir Docker destekli platformda kullanmak icin)
 
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 # VLC'yi kurabilmek icin gerekli sistem paketleri dahil
 RUN apt-get update && apt-get install -y \
