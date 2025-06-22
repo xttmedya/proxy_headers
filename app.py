@@ -2,6 +2,7 @@ from flask import Flask, request, Response
 import requests
 from urllib.parse import urlparse, urljoin, quote, unquote
 import re
+import os
 
 app = Flask(__name__)
 
@@ -114,5 +115,9 @@ def proxy_key():
 def index():
     return "Proxy aktif!"
 
+import os
+
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=7860)
+    port = int(os.environ.get("PORT", 7860))
+    app.run(host="0.0.0.0", port=port)
+
