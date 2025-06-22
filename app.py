@@ -83,36 +83,29 @@ def proxy_ts():
     if not ts_url:
         return "Hata: 'url' parametresi eksik", 400
 
-    headers = extract_headers_from_request()
+    headers = {
+        unquote(key[2:]).replace("_", "-"): unquote(value).strip()
+        for key, value in request.args.items()
+        if key.lower().startswith("h_")
+    }
 
     try:
         response = requests.get(ts_url, headers=headers, stream=True, timeout=(10, 30))
         response.raise_for_status()
+
+        # Gerçek content-type'ı alalım
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
 
         def generate():
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     yield chunk
 
-        return Response(generate(), content_type="video/mp2t")
+        return Response(generate(), content_type=content_type)
 
     except requests.RequestException as e:
         return f"Segment hatası: {str(e)}", 500
 
-@app.route('/proxy/key')
-def proxy_key():
-    key_url = request.args.get('url', '').strip()
-    if not key_url:
-        return "Hata: 'url' parametresi eksik", 400
-
-    headers = extract_headers_from_request()
-
-    try:
-        response = requests.get(key_url, headers=headers, timeout=(5, 15))
-        response.raise_for_status()
-        return Response(response.content, content_type="application/octet-stream")
-    except requests.RequestException as e:
-        return f"Key hatası: {str(e)}", 500
 
 @app.route('/')
 def index():
