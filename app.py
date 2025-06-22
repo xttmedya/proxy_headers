@@ -84,7 +84,9 @@ def proxy_ts():
                 if chunk:
                     yield chunk
 
-        return Response(generate(), content_type="video/mp2t")
+        # İçerik tipi tam doğru değilse bile video/mp2t uygun
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
+        return Response(generate(), content_type=content_type)
 
     except requests.RequestException as e:
         return f"Segment hatası: {str(e)}", 500
@@ -110,5 +112,4 @@ def index():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 7860))
-    print(f"Flask app started on port {port}")
     app.run(host="0.0.0.0", port=port)
