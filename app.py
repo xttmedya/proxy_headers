@@ -6,13 +6,11 @@ import re
 app = Flask(__name__)
 
 def detect_m3u_type(content):
-    """Dosyanın m3u mu m3u8 mi olduğunu anlamaya çalışır"""
     if "#EXTM3U" in content and "#EXTINF" in content:
         return "m3u8"
     return "m3u"
 
 def replace_key_uri(line, headers_query):
-    """EXT-X-KEY satırlarında geçen URI'yi proxy üzerinden yönlendirir"""
     match = re.search(r'URI="([^"]+)"', line)
     if match:
         key_url = match.group(1)
@@ -21,7 +19,6 @@ def replace_key_uri(line, headers_query):
     return line
 
 def extract_headers_from_request():
-    """?h_User-Agent=xxx gibi parametreleri header olarak kullanır"""
     return {
         unquote(k[2:]).replace("_", "-"): unquote(v).strip()
         for k, v in request.args.items()
@@ -38,27 +35,23 @@ def proxy_m3u():
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://www.bosstv4.com/"
     }
-
     headers = {**default_headers, **extract_headers_from_request()}
 
     try:
-        response = requests.get(m3u_url, headers=headers, timeout=(10, 20), verify=False)
+        response = requests.get(m3u_url, headers=headers, timeout=(10, 20))
         response.raise_for_status()
         m3u_content = response.text
         file_type = detect_m3u_type(m3u_content)
 
-        # Sadece TS segment içeren düz liste ise direkt döndür
         segment_lines = [l for l in m3u_content.splitlines() if l.strip() and not l.startswith("#")]
         if file_type == "m3u8" and all(".ts" in l for l in segment_lines):
             return Response(m3u_content, content_type="application/vnd.apple.mpegurl")
 
-        # Base URL’yi oluştur
         parsed_url = urlparse(response.url)
         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/', 1)[0]}/"
-
         headers_query = "&".join([f"h_{quote(k)}={quote(v)}" for k, v in headers.items()])
-        modified_m3u8 = []
 
+        modified_m3u8 = []
         for line in m3u_content.splitlines():
             line = line.strip()
             if line.startswith("#EXT-X-KEY") and 'URI="' in line:
@@ -71,7 +64,7 @@ def proxy_m3u():
         return Response("\n".join(modified_m3u8), content_type="application/vnd.apple.mpegurl")
 
     except requests.RequestException as e:
-        return f"Indirme hatası: {str(e)}", 500
+        return f"İndirme hatası: {str(e)}", 500
 
 @app.route('/proxy/ts')
 def proxy_ts():
@@ -112,8 +105,7 @@ def proxy_key():
 
 @app.route('/')
 def index():
-    return "📡 M3U8 Proxy sunucusu aktif. Kullanım için /proxy/m3u?url=... 👈"
+    return "Proxy aktif!"
 
-# Gerekirse burayı açarsın ama gunicorn kullanacağımız için __main__ bloğu çalışmaz
-# if __name__ == '__main__':
-#     app.run(host="0.0.0.0", port=7860)
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=7860)
