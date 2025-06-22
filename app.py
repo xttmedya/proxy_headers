@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all()
+
 from flask import Flask, request, Response
 import requests
 from urllib.parse import urlparse, urljoin, quote, unquote
