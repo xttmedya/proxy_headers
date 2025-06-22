@@ -1,12 +1,7 @@
 services:
   - type: web
-    name: proxy_headers
-    env: python
-    buildCommand: ""
-    startCommand: >
-      gunicorn app:app -w 4 --worker-class gthread --threads 4
-      -b 0.0.0.0:7860 --timeout 120 --keep-alive 5
-      --max-requests 1000 --max-requests-jitter 100
+    name: xttmcproxy
+    dockerfilePath: Dockerfile
     envVars:
       - key: PORT
-        value: 7860
+        value: "7860"
