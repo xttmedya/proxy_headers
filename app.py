@@ -43,8 +43,10 @@ def proxy_m3u():
         m3u_content = response.text
         file_type = detect_m3u_type(m3u_content)
 
+        # Burada segment uzantılarını genişlettik
+        allowed_extensions = [".ts", ".avif", ".mp4", ".aac", ".m4s", ".jpg", ".png"]
         segment_lines = [l for l in m3u_content.splitlines() if l.strip() and not l.startswith("#")]
-        if file_type == "m3u8" and all(".ts" in l for l in segment_lines):
+        if file_type == "m3u8" and all(any(ext in l for ext in allowed_extensions) for l in segment_lines):
             return Response(m3u_content, content_type="application/vnd.apple.mpegurl")
 
         parsed_url = urlparse(response.url)
@@ -78,12 +80,15 @@ def proxy_ts():
         response = requests.get(ts_url, headers=headers, stream=True, timeout=(10, 30))
         response.raise_for_status()
 
+        # İçerik tipine göre response header ayarı
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
+
         def generate():
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     yield chunk
 
-        return Response(generate(), content_type="video/mp2t")
+        return Response(generate(), content_type=content_type)
 
     except requests.RequestException as e:
         return f"Segment hatası: {str(e)}", 500
