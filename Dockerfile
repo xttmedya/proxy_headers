@@ -2,7 +2,6 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Sistem gereksinimlerini yükle
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
@@ -11,17 +10,12 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# GitHub reposunu klonla
-RUN git clone https://github.com/xttmedya/proxy_headers . 
+RUN git clone https://github.com/xttmedya/proxy_headers .
 
-# Gereksinim dosyası varsa yükle (yoksa app.py'nin bağımlılıklarını doğrudan yükle)
-COPY requirements.txt .  # varsa kullanılır
+# requirements.txt zaten repo içinde olduğundan tekrar kopyalamana gerek yok
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt || \
     pip install flask curl-cffi m3u8 gunicorn
-
-# Uygulama dosyasını kopyala (repo dışında dosya ekliyorsan)
-# COPY app.py .
 
 EXPOSE 7860
 
