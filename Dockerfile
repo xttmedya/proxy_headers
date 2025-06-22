@@ -12,10 +12,9 @@ RUN apt-get update && apt-get install -y \
 
 RUN git clone https://github.com/xttmedya/proxy_headers .
 
-# requirements.txt zaten repo içinde olduğundan tekrar kopyalamana gerek yok
+# requirements.txt içeriyorsa bu satır çalışır, yoksa elle yükleme yap
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt || \
-    pip install flask curl-cffi m3u8 gunicorn
+    pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 7860
 
