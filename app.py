@@ -1,11 +1,7 @@
-from gevent import monkey
-monkey.patch_all()
-
 from flask import Flask, request, Response
 import requests
 from urllib.parse import urlparse, urljoin, quote, unquote
 import re
-import os
 
 app = Flask(__name__)
 
@@ -86,17 +82,6 @@ def proxy_ts():
     headers = extract_headers_from_request()
 
     try:
-        # Başlıkları çekiyoruz (streaming değil)
-        head_response = requests.head(ts_url, headers=headers, timeout=10, allow_redirects=True)
-        content_type = head_response.headers.get("Content-Type", "").lower()
-
-        # İzin verilen türler (video olmalı ama .avif bile olsa Content-Type video olabilir)
-        allowed_types = ["video/mp2t", "application/octet-stream", "video/MP2T", "video/avc", "application/x-mpegurl"]
-
-        if not any(t in content_type for t in allowed_types):
-            return f"Uygunsuz içerik türü: {content_type}", 415
-
-        # Gerçek içeriği stream et
         response = requests.get(ts_url, headers=headers, stream=True, timeout=(10, 30))
         response.raise_for_status()
 
@@ -105,19 +90,29 @@ def proxy_ts():
                 if chunk:
                     yield chunk
 
-        return Response(generate(), content_type=content_type or "video/mp2t")
+        return Response(generate(), content_type="video/mp2t")
 
     except requests.RequestException as e:
         return f"Segment hatası: {str(e)}", 500
 
+@app.route('/proxy/key')
+def proxy_key():
+    key_url = request.args.get('url', '').strip()
+    if not key_url:
+        return "Hata: 'url' parametresi eksik", 400
+
+    headers = extract_headers_from_request()
+
+    try:
+        response = requests.get(key_url, headers=headers, timeout=(5, 15))
+        response.raise_for_status()
+        return Response(response.content, content_type="application/octet-stream")
+    except requests.RequestException as e:
+        return f"Key hatası: {str(e)}", 500
 
 @app.route('/')
 def index():
     return "Proxy aktif!"
 
-import os
-
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 7860))
-    app.run(host="0.0.0.0", port=port)
-
+    app.run(host="0.0.0.0", port=7860)
