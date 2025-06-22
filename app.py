@@ -83,25 +83,29 @@ def proxy_ts():
     if not ts_url:
         return "Hata: 'url' parametresi eksik", 400
 
-    headers = {
-        unquote(key[2:]).replace("_", "-"): unquote(value).strip()
-        for key, value in request.args.items()
-        if key.lower().startswith("h_")
-    }
+    headers = extract_headers_from_request()
 
     try:
+        # Başlıkları çekiyoruz (streaming değil)
+        head_response = requests.head(ts_url, headers=headers, timeout=10, allow_redirects=True)
+        content_type = head_response.headers.get("Content-Type", "").lower()
+
+        # İzin verilen türler (video olmalı ama .avif bile olsa Content-Type video olabilir)
+        allowed_types = ["video/mp2t", "application/octet-stream", "video/MP2T", "video/avc", "application/x-mpegurl"]
+
+        if not any(t in content_type for t in allowed_types):
+            return f"Uygunsuz içerik türü: {content_type}", 415
+
+        # Gerçek içeriği stream et
         response = requests.get(ts_url, headers=headers, stream=True, timeout=(10, 30))
         response.raise_for_status()
-
-        # Gerçek content-type'ı alalım
-        content_type = response.headers.get("Content-Type", "application/octet-stream")
 
         def generate():
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     yield chunk
 
-        return Response(generate(), content_type=content_type)
+        return Response(generate(), content_type=content_type or "video/mp2t")
 
     except requests.RequestException as e:
         return f"Segment hatası: {str(e)}", 500
