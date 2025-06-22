@@ -1,4 +1,3 @@
 flask
-curl-cffi
-m3u8
-gunicorn
+requests
+gunicorn[gevent]
